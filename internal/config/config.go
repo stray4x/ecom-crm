@@ -9,12 +9,16 @@ import (
 )
 
 type Config struct {
-	AppPort    string `env:"APP_PORT"    validate:"required"`
-	DBHost     string `env:"DB_HOST"     validate:"required"`
-	DBPort     string `env:"DB_PORT"     validate:"required"`
-	DBUser     string `env:"DB_USER"     validate:"required"`
-	DBPassword string `env:"DB_PASSWORD" validate:"required"`
-	DBName     string `env:"DB_NAME"     validate:"required"`
+	AppEnv           string `env:"APP_ENV"     validate:"required,oneof=development production"`
+	AppDomain        string `env:"APP_DOMAIN"  validate:"required"`
+	AppPort          string `env:"APP_PORT"    validate:"required"`
+	DBHost           string `env:"DB_HOST"     validate:"required"`
+	DBPort           string `env:"DB_PORT"     validate:"required"`
+	DBUser           string `env:"DB_USER"     validate:"required"`
+	DBPassword       string `env:"DB_PASSWORD" validate:"required"`
+	DBName           string `env:"DB_NAME"     validate:"required"`
+	JWTAccessSecret  string `env:"JWT_ACCESS_SECRET"  validate:"required"`
+	JWTRefreshSecret string `env:"JWT_REFRESH_SECRET" validate:"required"`
 }
 
 func initConfig() *Config {
@@ -23,12 +27,16 @@ func initConfig() *Config {
 	}
 
 	cfg := &Config{
-		AppPort:    os.Getenv("APP_PORT"),
-		DBHost:     os.Getenv("DB_HOST"),
-		DBPort:     os.Getenv("DB_PORT"),
-		DBUser:     os.Getenv("DB_USER"),
-		DBPassword: os.Getenv("DB_PASSWORD"),
-		DBName:     os.Getenv("DB_NAME"),
+		AppEnv:           os.Getenv("APP_ENV"),
+		AppDomain:        os.Getenv("APP_DOMAIN"),
+		AppPort:          os.Getenv("APP_PORT"),
+		DBHost:           os.Getenv("DB_HOST"),
+		DBPort:           os.Getenv("DB_PORT"),
+		DBUser:           os.Getenv("DB_USER"),
+		DBPassword:       os.Getenv("DB_PASSWORD"),
+		DBName:           os.Getenv("DB_NAME"),
+		JWTAccessSecret:  os.Getenv("JWT_ACCESS_SECRET"),
+		JWTRefreshSecret: os.Getenv("JWT_REFRESH_SECRET"),
 	}
 
 	validate := validator.New()

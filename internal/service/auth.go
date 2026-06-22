@@ -1,0 +1,180 @@
+package service
+
+import (
+	"errors"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"github.com/stray4x/ecom-crm/internal/config"
+	"github.com/stray4x/ecom-crm/internal/dto"
+	"github.com/stray4x/ecom-crm/internal/models"
+	"github.com/stray4x/ecom-crm/internal/repository"
+	"github.com/stray4x/ecom-crm/pkg/csrf"
+	"golang.org/x/crypto/bcrypt"
+)
+
+type Tokens struct {
+	AccessToken  string
+	RefreshToken string
+	CSRFToken    string
+}
+
+type AuthService interface {
+	Register(req dto.RegisterCustomerRequest) (*dto.CustomerResponse, *Tokens, error)
+	Login(req dto.LoginRequest) (*dto.CustomerResponse, *Tokens, error)
+	Refresh(refreshToken string) (*Tokens, error)
+}
+
+type authService struct {
+	customerRepo repository.CustomerRepository
+}
+
+func NewAuthService(customerRepo repository.CustomerRepository) AuthService {
+	return &authService{customerRepo}
+}
+
+func (s *authService) Register(req dto.RegisterCustomerRequest) (*dto.CustomerResponse, *Tokens, error) {
+	existing, err := s.customerRepo.GetByEmail(req.Email)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if existing != nil {
+		return nil, nil, errors.New("Email already in use")
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	customer := &models.Customer{
+		FirstName:    req.FirstName,
+		LastName:     req.LastName,
+		Email:        req.Email,
+		Phone:        req.Phone,
+		PasswordHash: string(hash),
+	}
+
+	if err := s.customerRepo.Create(customer); err != nil {
+		return nil, nil, err
+	}
+
+	tokens, err := generateTokens(customer.ID)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return toCustomerResponse(customer), tokens, nil
+}
+
+func (s *authService) Login(req dto.LoginRequest) (*dto.CustomerResponse, *Tokens, error) {
+	customer, err := s.customerRepo.GetByEmail(req.Email)
+	if err != nil {
+		return nil, nil, errors.New("Email or password does not match")
+	}
+	if customer == nil {
+		return nil, nil, errors.New("Email or password does not match")
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(customer.PasswordHash), []byte(req.Password)); err != nil {
+		return nil, nil, errors.New("Email or password does not match")
+	}
+
+	tokens, err := generateTokens(customer.ID)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return toCustomerResponse(customer), tokens, nil
+}
+
+func (s *authService) Refresh(refreshToken string) (*Tokens, error) {
+	token, err := jwt.Parse(refreshToken, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("invalid refresh token")
+		}
+		return []byte(config.Env.JWTRefreshSecret), nil
+	})
+	if err != nil || !token.Valid {
+		return nil, errors.New("invalid refresh token")
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, errors.New("invalid refresh token")
+	}
+
+	if claims["type"] != "refresh" {
+		return nil, errors.New("invalid refresh token")
+	}
+
+	customerID, err := uuid.Parse(claims["sub"].(string))
+	if err != nil {
+		return nil, errors.New("invalid refresh token")
+	}
+
+	tokens, err := generateTokens(customerID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return tokens, nil
+}
+
+func generateAccessToken(customerID uuid.UUID) (string, error) {
+	claims := jwt.MapClaims{
+		"sub":  customerID.String(),
+		"exp":  time.Now().Add(15 * time.Minute).Unix(),
+		"type": "access",
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(config.Env.JWTAccessSecret))
+}
+
+func generateRefreshToken(customerID uuid.UUID) (string, error) {
+	claims := jwt.MapClaims{
+		"sub":  customerID.String(),
+		"exp":  time.Now().Add(7 * 24 * time.Hour).Unix(),
+		"type": "refresh",
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(config.Env.JWTRefreshSecret))
+}
+
+func generateTokens(customerID uuid.UUID) (*Tokens, error) {
+	accessToken, err := generateAccessToken(customerID)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshToken, err := generateRefreshToken(customerID)
+	if err != nil {
+		return nil, err
+	}
+
+	csrfToken, err := csrf.GenerateToken()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Tokens{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		CSRFToken:    csrfToken,
+	}, nil
+}
+
+func toCustomerResponse(c *models.Customer) *dto.CustomerResponse {
+	return &dto.CustomerResponse{
+		ID:        c.ID.String(),
+		FirstName: c.FirstName,
+		LastName:  c.LastName,
+		Email:     c.Email,
+		Phone:     c.Phone,
+	}
+}

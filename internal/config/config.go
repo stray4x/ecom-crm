@@ -21,7 +21,7 @@ type Config struct {
 	JWTRefreshSecret string `env:"JWT_REFRESH_SECRET" validate:"required"`
 }
 
-func initConfig() *Config {
+func InitConfig() *Config {
 	if err := godotenv.Load(); err != nil {
 		log.Println("no .env file, reading from environment")
 	}
@@ -47,5 +47,3 @@ func initConfig() *Config {
 
 	return cfg
 }
-
-var Env = initConfig()

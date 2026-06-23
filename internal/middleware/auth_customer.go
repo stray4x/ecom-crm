@@ -8,10 +8,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/stray4x/ecom-crm/internal/config"
 )
 
-func AuthMiddleware() gin.HandlerFunc {
+func AuthMiddleware(jwtAccessSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -33,7 +32,7 @@ func AuthMiddleware() gin.HandlerFunc {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, errors.New("invalid token")
 			}
-			return []byte(config.Env.JWTAccessSecret), nil
+			return []byte(jwtAccessSecret), nil
 		})
 		if err != nil || !token.Valid {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})

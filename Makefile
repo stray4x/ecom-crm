@@ -16,5 +16,14 @@ migrate-up:
 migrate-down:
 	@go run cmd/migrate/main.go down
 
+test:
+	go test ./internal/...
+
+test-verbose:
+	go test -v ./internal/...
+
+mocks:
+	@mockery
+
 %:
 	@:

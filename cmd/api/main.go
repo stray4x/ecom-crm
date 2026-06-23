@@ -13,14 +13,15 @@ import (
 )
 
 func main() {
-	db := database.NewDB(config.Env)
+	cfg := config.InitConfig()
+	db := database.NewDB(cfg)
 
 	customerRepo := repository.NewCustomerRepository(db)
 
-	authService := service.NewAuthService(customerRepo)
+	authService := service.NewAuthService(customerRepo, cfg)
 
 	handlers := &routes.Handlers{
-		Auth: handlers.NewAuthHandler(authService),
+		Auth: handlers.NewAuthHandler(authService, cfg),
 	}
 
 	router := gin.New()
@@ -30,5 +31,5 @@ func main() {
 
 	routes.Setup(router, handlers)
 
-	log.Fatal(router.Run(":" + config.Env.AppPort))
+	log.Fatal(router.Run(":" + cfg.AppPort))
 }

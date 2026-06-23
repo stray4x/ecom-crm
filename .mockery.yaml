@@ -1,0 +1,9 @@
+template: testify
+packages:
+  github.com/stray4x/ecom-crm/internal/repository:
+    interfaces:
+      CustomerRepository:
+        config:
+          dir: "internal/repository/mocks"
+          pkgname: mocks
+          filename: "customer_repository.go"

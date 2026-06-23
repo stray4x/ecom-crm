@@ -27,11 +27,17 @@ type AuthService interface {
 }
 
 type authService struct {
-	customerRepo repository.CustomerRepository
+	customerRepo     repository.CustomerRepository
+	jwtAccessSecret  string
+	jwtRefreshSecret string
 }
 
-func NewAuthService(customerRepo repository.CustomerRepository) AuthService {
-	return &authService{customerRepo}
+func NewAuthService(customerRepo repository.CustomerRepository, cfg *config.Config) AuthService {
+	return &authService{
+		customerRepo:     customerRepo,
+		jwtAccessSecret:  cfg.JWTAccessSecret,
+		jwtRefreshSecret: cfg.JWTRefreshSecret,
+	}
 }
 
 func (s *authService) Register(req dto.RegisterCustomerRequest) (*dto.CustomerResponse, *Tokens, error) {
@@ -61,7 +67,7 @@ func (s *authService) Register(req dto.RegisterCustomerRequest) (*dto.CustomerRe
 		return nil, nil, err
 	}
 
-	tokens, err := generateTokens(customer.ID)
+	tokens, err := s.generateTokens(customer.ID)
 
 	if err != nil {
 		return nil, nil, err
@@ -83,7 +89,7 @@ func (s *authService) Login(req dto.LoginRequest) (*dto.CustomerResponse, *Token
 		return nil, nil, errors.New("Email or password does not match")
 	}
 
-	tokens, err := generateTokens(customer.ID)
+	tokens, err := s.generateTokens(customer.ID)
 
 	if err != nil {
 		return nil, nil, err
@@ -97,7 +103,7 @@ func (s *authService) Refresh(refreshToken string) (*Tokens, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("invalid refresh token")
 		}
-		return []byte(config.Env.JWTRefreshSecret), nil
+		return []byte(s.jwtRefreshSecret), nil
 	})
 	if err != nil || !token.Valid {
 		return nil, errors.New("invalid refresh token")
@@ -117,7 +123,7 @@ func (s *authService) Refresh(refreshToken string) (*Tokens, error) {
 		return nil, errors.New("invalid refresh token")
 	}
 
-	tokens, err := generateTokens(customerID)
+	tokens, err := s.generateTokens(customerID)
 
 	if err != nil {
 		return nil, err
@@ -126,33 +132,33 @@ func (s *authService) Refresh(refreshToken string) (*Tokens, error) {
 	return tokens, nil
 }
 
-func generateAccessToken(customerID uuid.UUID) (string, error) {
+func (s *authService) generateAccessToken(customerID uuid.UUID) (string, error) {
 	claims := jwt.MapClaims{
 		"sub":  customerID.String(),
 		"exp":  time.Now().Add(15 * time.Minute).Unix(),
 		"type": "access",
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(config.Env.JWTAccessSecret))
+	return token.SignedString([]byte(s.jwtAccessSecret))
 }
 
-func generateRefreshToken(customerID uuid.UUID) (string, error) {
+func (s *authService) generateRefreshToken(customerID uuid.UUID) (string, error) {
 	claims := jwt.MapClaims{
 		"sub":  customerID.String(),
 		"exp":  time.Now().Add(7 * 24 * time.Hour).Unix(),
 		"type": "refresh",
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(config.Env.JWTRefreshSecret))
+	return token.SignedString([]byte(s.jwtRefreshSecret))
 }
 
-func generateTokens(customerID uuid.UUID) (*Tokens, error) {
-	accessToken, err := generateAccessToken(customerID)
+func (s *authService) generateTokens(customerID uuid.UUID) (*Tokens, error) {
+	accessToken, err := s.generateAccessToken(customerID)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := generateRefreshToken(customerID)
+	refreshToken, err := s.generateRefreshToken(customerID)
 	if err != nil {
 		return nil, err
 	}

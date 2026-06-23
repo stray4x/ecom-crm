@@ -11,10 +11,11 @@ import (
 
 type AuthHandler struct {
 	authService service.AuthService
+	config      *config.Config
 }
 
-func NewAuthHandler(authService service.AuthService) *AuthHandler {
-	return &AuthHandler{authService: authService}
+func NewAuthHandler(authService service.AuthService, cfg *config.Config) *AuthHandler {
+	return &AuthHandler{authService: authService, config: cfg}
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
@@ -31,7 +32,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	setAuthCookies(c, tokens.RefreshToken, tokens.CSRFToken)
+	setAuthCookies(c, tokens.RefreshToken, tokens.CSRFToken, h.config.AppDomain, h.config.AppEnv)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"customer":    customer,
@@ -53,7 +54,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	setAuthCookies(c, tokens.RefreshToken, tokens.CSRFToken)
+	setAuthCookies(c, tokens.RefreshToken, tokens.CSRFToken, h.config.AppDomain, h.config.AppEnv)
 
 	c.JSON(http.StatusOK, gin.H{
 		"customer":    customer,
@@ -68,8 +69,8 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		"",
 		-1,
 		"/",
-		config.Env.AppDomain,
-		config.Env.AppEnv == "production",
+		h.config.AppDomain,
+		h.config.AppEnv == "production",
 		true,
 	)
 
@@ -89,7 +90,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	setAuthCookies(c, tokens.RefreshToken, tokens.CSRFToken)
+	setAuthCookies(c, tokens.RefreshToken, tokens.CSRFToken, h.config.AppDomain, h.config.AppEnv)
 
 	c.JSON(http.StatusOK, gin.H{
 		"accessToken": tokens.AccessToken,
@@ -97,14 +98,14 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	})
 }
 
-func setAuthCookies(c *gin.Context, refreshToken, csrfToken string) {
+func setAuthCookies(c *gin.Context, refreshToken, csrfToken, appDomain, appEnv string) {
 	c.SetCookie(
 		"refresh_token",
 		refreshToken,
 		7*24*60*60,
 		"/",
-		config.Env.AppDomain,
-		config.Env.AppEnv == "production",
+		appDomain,
+		appEnv == "production",
 		true,
 	)
 
@@ -113,8 +114,8 @@ func setAuthCookies(c *gin.Context, refreshToken, csrfToken string) {
 		csrfToken,
 		7*24*60*60,
 		"/",
-		config.Env.AppDomain,
-		config.Env.AppEnv == "production",
+		appDomain,
+		appEnv == "production",
 		false,
 	)
 }

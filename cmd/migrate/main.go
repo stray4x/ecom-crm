@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	cfg := config.Env
+	cfg := config.InitConfig()
 
 	dsn := fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",

@@ -7,3 +7,10 @@ packages:
           dir: "internal/repository/mocks"
           pkgname: mocks
           filename: "customer_repository.go"
+  github.com/stray4x/ecom-crm/internal/service:
+    interfaces:
+      AuthService:
+        config:
+          dir: "internal/service/mocks"
+          pkgname: mocks
+          filename: "auth_service.go"

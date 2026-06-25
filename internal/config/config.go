@@ -19,6 +19,8 @@ type Config struct {
 	DBName           string `env:"DB_NAME"     validate:"required"`
 	JWTAccessSecret  string `env:"JWT_ACCESS_SECRET"  validate:"required"`
 	JWTRefreshSecret string `env:"JWT_REFRESH_SECRET" validate:"required"`
+	RedisHost        string `env:"REDIS_HOST" validate:"required"`
+	RedisPort        string `env:"REDIS_PORT" validate:"required"`
 }
 
 func InitConfig() *Config {
@@ -37,6 +39,8 @@ func InitConfig() *Config {
 		DBName:           os.Getenv("DB_NAME"),
 		JWTAccessSecret:  os.Getenv("JWT_ACCESS_SECRET"),
 		JWTRefreshSecret: os.Getenv("JWT_REFRESH_SECRET"),
+		RedisHost:        os.Getenv("REDIS_HOST"),
+		RedisPort:        os.Getenv("REDIS_PORT"),
 	}
 
 	validate := validator.New()

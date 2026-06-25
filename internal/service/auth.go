@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/stray4x/ecom-crm/internal/config"
 	"github.com/stray4x/ecom-crm/internal/dto"
 	"github.com/stray4x/ecom-crm/internal/models"
+	"github.com/stray4x/ecom-crm/internal/redis"
 	"github.com/stray4x/ecom-crm/internal/repository"
 	"github.com/stray4x/ecom-crm/pkg/csrf"
 	"golang.org/x/crypto/bcrypt"
@@ -24,17 +26,24 @@ type AuthService interface {
 	Register(req dto.RegisterCustomerRequest) (*dto.CustomerResponse, *Tokens, error)
 	Login(req dto.LoginRequest) (*dto.CustomerResponse, *Tokens, error)
 	Refresh(refreshToken string) (*Tokens, error)
+	Logout(refreshToken string) error
 }
 
 type authService struct {
 	customerRepo     repository.CustomerRepository
 	jwtAccessSecret  string
 	jwtRefreshSecret string
+	tokenStore       redis.TokenStore
 }
 
-func NewAuthService(customerRepo repository.CustomerRepository, cfg *config.Config) AuthService {
+func NewAuthService(
+	customerRepo repository.CustomerRepository,
+	cfg *config.Config,
+	tokenStore redis.TokenStore,
+) AuthService {
 	return &authService{
 		customerRepo:     customerRepo,
+		tokenStore:       tokenStore,
 		jwtAccessSecret:  cfg.JWTAccessSecret,
 		jwtRefreshSecret: cfg.JWTRefreshSecret,
 	}
@@ -110,11 +119,7 @@ func (s *authService) Refresh(refreshToken string) (*Tokens, error) {
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return nil, errors.New("invalid refresh token")
-	}
-
-	if claims["type"] != "refresh" {
+	if !ok || claims["type"] != "refresh" {
 		return nil, errors.New("invalid refresh token")
 	}
 
@@ -123,13 +128,39 @@ func (s *authService) Refresh(refreshToken string) (*Tokens, error) {
 		return nil, errors.New("invalid refresh token")
 	}
 
-	tokens, err := s.generateTokens(customerID)
-
-	if err != nil {
-		return nil, err
+	stored, err := s.tokenStore.Get(context.Background(), customerID.String())
+	if err != nil || stored != refreshToken {
+		return nil, errors.New("refresh token revoked")
 	}
 
-	return tokens, nil
+	_ = s.tokenStore.Delete(context.Background(), customerID.String())
+
+	return s.generateTokens(customerID)
+}
+
+func (s *authService) Logout(refreshToken string) error {
+	token, err := jwt.Parse(refreshToken, func(token *jwt.Token) (interface{}, error) {
+		return []byte(s.jwtRefreshSecret), nil
+	})
+	if err != nil || !token.Valid {
+		return nil
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil
+	}
+
+	if claims["type"] != "refresh" {
+		return nil
+	}
+
+	customerID, err := uuid.Parse(claims["sub"].(string))
+	if err != nil {
+		return nil
+	}
+
+	return s.tokenStore.Delete(context.Background(), customerID.String())
 }
 
 func (s *authService) generateAccessToken(customerID uuid.UUID) (string, error) {
@@ -160,6 +191,15 @@ func (s *authService) generateTokens(customerID uuid.UUID) (*Tokens, error) {
 
 	refreshToken, err := s.generateRefreshToken(customerID)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := s.tokenStore.Save(
+		context.Background(),
+		customerID.String(),
+		refreshToken,
+		7*24*time.Hour,
+	); err != nil {
 		return nil, err
 	}
 

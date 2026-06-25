@@ -64,6 +64,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
+	refreshToken, err := c.Cookie("refresh_token")
+
+	if err == nil && refreshToken != "" {
+		h.authService.Logout(refreshToken)
+	}
+
 	c.SetCookie(
 		"refresh_token",
 		"",

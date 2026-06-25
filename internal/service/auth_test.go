@@ -10,7 +10,9 @@ import (
 	"github.com/stray4x/ecom-crm/internal/config"
 	"github.com/stray4x/ecom-crm/internal/dto"
 	"github.com/stray4x/ecom-crm/internal/models"
+	redisMocks "github.com/stray4x/ecom-crm/internal/redis/mocks"
 	"github.com/stray4x/ecom-crm/internal/repository/mocks"
+	repoMocks "github.com/stray4x/ecom-crm/internal/repository/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/crypto/bcrypt"
@@ -24,6 +26,14 @@ var cfg_test = &config.Config{
 func hashPassword(pw string) string {
 	hash, _ := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
 	return string(hash)
+}
+
+func createJWT(userId uuid.UUID) *jwt.Token {
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub":  userId.String(),
+		"type": "refresh",
+		"exp":  time.Now().Add(time.Hour).Unix(),
+	})
 }
 
 func TestAuthService_Register(t *testing.T) {
@@ -87,7 +97,8 @@ func TestAuthService_Register(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockRepo := mocks.NewMockCustomerRepository(t)
+			mockRepo := repoMocks.NewMockCustomerRepository(t)
+			mockTokenStore := redisMocks.NewMockTokenStore(t)
 
 			mockRepo.EXPECT().
 				GetByEmail(tt.request.Email).
@@ -97,9 +108,20 @@ func TestAuthService_Register(t *testing.T) {
 				mockRepo.EXPECT().
 					Create(mock.AnythingOfType("*models.Customer")).
 					Return(tt.createErr)
+
+				if tt.createErr == nil {
+					mockTokenStore.EXPECT().
+						Save(
+							mock.Anything,
+							mock.AnythingOfType("string"),
+							mock.AnythingOfType("string"),
+							7*24*time.Hour,
+						).
+						Return(nil)
+				}
 			}
 
-			service := NewAuthService(mockRepo, cfg_test)
+			service := NewAuthService(mockRepo, cfg_test, mockTokenStore)
 
 			res, tokens, err := service.Register(tt.request)
 
@@ -166,12 +188,24 @@ func TestAuthService_Login(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := mocks.NewMockCustomerRepository(t)
+			mockTokenStore := redisMocks.NewMockTokenStore(t)
 
 			mockRepo.EXPECT().
 				GetByEmail(tt.email).
 				Return(tt.mockUser, tt.mockErr)
 
-			service := NewAuthService(mockRepo, cfg_test)
+			if !tt.expectError {
+				mockTokenStore.EXPECT().
+					Save(
+						mock.Anything,
+						mock.AnythingOfType("string"),
+						mock.AnythingOfType("string"),
+						7*24*time.Hour,
+					).
+					Return(nil)
+			}
+
+			service := NewAuthService(mockRepo, cfg_test, mockTokenStore)
 
 			res, tokens, err := service.Login(dto.LoginRequest{
 				Email:    tt.email,
@@ -195,20 +229,38 @@ func TestAuthService_Login(t *testing.T) {
 
 func TestAuthService_Refresh_Success(t *testing.T) {
 	mockRepo := mocks.NewMockCustomerRepository(t)
+	mockTokenStore := redisMocks.NewMockTokenStore(t)
 
-	authService := NewAuthService(mockRepo, cfg_test)
+	authService := NewAuthService(mockRepo, cfg_test, mockTokenStore)
 
 	customerID := uuid.New()
 
-	claims := jwt.MapClaims{
-		"sub":  customerID.String(),
-		"exp":  time.Now().Add(1 * time.Hour).Unix(),
-		"type": "refresh",
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	token := createJWT(customerID)
 	refreshToken, err := token.SignedString([]byte(cfg_test.JWTRefreshSecret))
 	assert.NoError(t, err)
+
+	mockTokenStore.EXPECT().
+		Get(
+			mock.Anything,
+			customerID.String(),
+		).
+		Return(refreshToken, nil)
+
+	mockTokenStore.EXPECT().
+		Delete(
+			mock.Anything,
+			customerID.String(),
+		).
+		Return(nil)
+
+	mockTokenStore.EXPECT().
+		Save(
+			mock.Anything,
+			customerID.String(),
+			mock.AnythingOfType("string"),
+			7*24*time.Hour,
+		).
+		Return(nil)
 
 	tokens, err := authService.Refresh(refreshToken)
 
@@ -218,4 +270,32 @@ func TestAuthService_Refresh_Success(t *testing.T) {
 	assert.NotEmpty(t, tokens.AccessToken)
 	assert.NotEmpty(t, tokens.RefreshToken)
 	assert.NotEmpty(t, tokens.CSRFToken)
+}
+
+func TestAuthService_Logout(t *testing.T) {
+	mockRepo := mocks.NewMockCustomerRepository(t)
+	mockTokenStore := redisMocks.NewMockTokenStore(t)
+
+	customerID := uuid.New()
+
+	token := createJWT(customerID)
+
+	refreshToken, err := token.SignedString(
+		[]byte(cfg_test.JWTRefreshSecret),
+	)
+	assert.NoError(t, err)
+
+	mockTokenStore.EXPECT().
+		Delete(mock.Anything, customerID.String()).
+		Return(nil)
+
+	authService := NewAuthService(
+		mockRepo,
+		cfg_test,
+		mockTokenStore,
+	)
+
+	err = authService.Logout(refreshToken)
+
+	assert.NoError(t, err)
 }

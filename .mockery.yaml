@@ -14,3 +14,10 @@ packages:
           dir: "internal/service/mocks"
           pkgname: mocks
           filename: "auth_service.go"
+  github.com/stray4x/ecom-crm/internal/redis:
+    interfaces:
+      TokenStore:
+        config:
+          dir: "internal/redis/mocks"
+          pkgname: mocks
+          filename: "token_store.go"

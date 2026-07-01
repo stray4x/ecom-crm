@@ -18,7 +18,7 @@ import (
 // @version 1.0
 // @description E-commerce CRM service
 // @host localhost:8080
-// @BasePath /api
+// @BasePath /
 func main() {
 	cfg := config.InitConfig()
 	db := database.NewDB(cfg)

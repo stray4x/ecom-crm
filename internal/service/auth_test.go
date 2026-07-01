@@ -28,9 +28,10 @@ func hashPassword(pw string) string {
 	return string(hash)
 }
 
-func createJWT(userId uuid.UUID) *jwt.Token {
+func createJWT(userID uuid.UUID, sessionID uuid.UUID) *jwt.Token {
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub":  userId.String(),
+		"sub":  userID.String(),
+		"sid":  sessionID.String(),
 		"type": "refresh",
 		"exp":  time.Now().Add(time.Hour).Unix(),
 	})
@@ -113,6 +114,7 @@ func TestAuthService_Register(t *testing.T) {
 					mockTokenStore.EXPECT().
 						Save(
 							mock.Anything,
+							mock.AnythingOfType("string"),
 							mock.AnythingOfType("string"),
 							mock.AnythingOfType("string"),
 							7*24*time.Hour,
@@ -200,6 +202,7 @@ func TestAuthService_Login(t *testing.T) {
 						mock.Anything,
 						mock.AnythingOfType("string"),
 						mock.AnythingOfType("string"),
+						mock.AnythingOfType("string"),
 						7*24*time.Hour,
 					).
 					Return(nil)
@@ -234,8 +237,9 @@ func TestAuthService_Refresh_Success(t *testing.T) {
 	authService := NewAuthService(mockRepo, cfg_test, mockTokenStore)
 
 	customerID := uuid.New()
+	sessionID := uuid.New()
 
-	token := createJWT(customerID)
+	token := createJWT(customerID, sessionID)
 	refreshToken, err := token.SignedString([]byte(cfg_test.JWTRefreshSecret))
 	assert.NoError(t, err)
 
@@ -243,6 +247,7 @@ func TestAuthService_Refresh_Success(t *testing.T) {
 		Get(
 			mock.Anything,
 			customerID.String(),
+			sessionID.String(),
 		).
 		Return(refreshToken, nil)
 
@@ -250,6 +255,7 @@ func TestAuthService_Refresh_Success(t *testing.T) {
 		Delete(
 			mock.Anything,
 			customerID.String(),
+			sessionID.String(),
 		).
 		Return(nil)
 
@@ -257,6 +263,7 @@ func TestAuthService_Refresh_Success(t *testing.T) {
 		Save(
 			mock.Anything,
 			customerID.String(),
+			sessionID.String(),
 			mock.AnythingOfType("string"),
 			7*24*time.Hour,
 		).
@@ -277,8 +284,9 @@ func TestAuthService_Logout(t *testing.T) {
 	mockTokenStore := redisMocks.NewMockTokenStore(t)
 
 	customerID := uuid.New()
+	sessionID := uuid.New()
 
-	token := createJWT(customerID)
+	token := createJWT(customerID, sessionID)
 
 	refreshToken, err := token.SignedString(
 		[]byte(cfg_test.JWTRefreshSecret),
@@ -286,7 +294,7 @@ func TestAuthService_Logout(t *testing.T) {
 	assert.NoError(t, err)
 
 	mockTokenStore.EXPECT().
-		Delete(mock.Anything, customerID.String()).
+		Delete(mock.Anything, customerID.String(), sessionID.String()).
 		Return(nil)
 
 	authService := NewAuthService(

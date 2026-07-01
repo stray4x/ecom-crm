@@ -39,16 +39,16 @@ func (_m *MockTokenStore) EXPECT() *MockTokenStore_Expecter {
 }
 
 // Delete provides a mock function for the type MockTokenStore
-func (_mock *MockTokenStore) Delete(ctx context.Context, customerID string) error {
-	ret := _mock.Called(ctx, customerID)
+func (_mock *MockTokenStore) Delete(ctx context.Context, customerID string, sessionID string) error {
+	ret := _mock.Called(ctx, customerID, sessionID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Delete")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = returnFunc(ctx, customerID)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = returnFunc(ctx, customerID, sessionID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -63,11 +63,12 @@ type MockTokenStore_Delete_Call struct {
 // Delete is a helper method to define mock.On call
 //   - ctx context.Context
 //   - customerID string
-func (_e *MockTokenStore_Expecter) Delete(ctx any, customerID any) *MockTokenStore_Delete_Call {
-	return &MockTokenStore_Delete_Call{Call: _e.mock.On("Delete", ctx, customerID)}
+//   - sessionID string
+func (_e *MockTokenStore_Expecter) Delete(ctx any, customerID any, sessionID any) *MockTokenStore_Delete_Call {
+	return &MockTokenStore_Delete_Call{Call: _e.mock.On("Delete", ctx, customerID, sessionID)}
 }
 
-func (_c *MockTokenStore_Delete_Call) Run(run func(ctx context.Context, customerID string)) *MockTokenStore_Delete_Call {
+func (_c *MockTokenStore_Delete_Call) Run(run func(ctx context.Context, customerID string, sessionID string)) *MockTokenStore_Delete_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -77,9 +78,14 @@ func (_c *MockTokenStore_Delete_Call) Run(run func(ctx context.Context, customer
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -90,14 +96,14 @@ func (_c *MockTokenStore_Delete_Call) Return(err error) *MockTokenStore_Delete_C
 	return _c
 }
 
-func (_c *MockTokenStore_Delete_Call) RunAndReturn(run func(ctx context.Context, customerID string) error) *MockTokenStore_Delete_Call {
+func (_c *MockTokenStore_Delete_Call) RunAndReturn(run func(ctx context.Context, customerID string, sessionID string) error) *MockTokenStore_Delete_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Get provides a mock function for the type MockTokenStore
-func (_mock *MockTokenStore) Get(ctx context.Context, customerID string) (string, error) {
-	ret := _mock.Called(ctx, customerID)
+func (_mock *MockTokenStore) Get(ctx context.Context, customerID string, sessionID string) (string, error) {
+	ret := _mock.Called(ctx, customerID, sessionID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Get")
@@ -105,16 +111,16 @@ func (_mock *MockTokenStore) Get(ctx context.Context, customerID string) (string
 
 	var r0 string
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
-		return returnFunc(ctx, customerID)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (string, error)); ok {
+		return returnFunc(ctx, customerID, sessionID)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) string); ok {
-		r0 = returnFunc(ctx, customerID)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) string); ok {
+		r0 = returnFunc(ctx, customerID, sessionID)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = returnFunc(ctx, customerID)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = returnFunc(ctx, customerID, sessionID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -129,11 +135,12 @@ type MockTokenStore_Get_Call struct {
 // Get is a helper method to define mock.On call
 //   - ctx context.Context
 //   - customerID string
-func (_e *MockTokenStore_Expecter) Get(ctx any, customerID any) *MockTokenStore_Get_Call {
-	return &MockTokenStore_Get_Call{Call: _e.mock.On("Get", ctx, customerID)}
+//   - sessionID string
+func (_e *MockTokenStore_Expecter) Get(ctx any, customerID any, sessionID any) *MockTokenStore_Get_Call {
+	return &MockTokenStore_Get_Call{Call: _e.mock.On("Get", ctx, customerID, sessionID)}
 }
 
-func (_c *MockTokenStore_Get_Call) Run(run func(ctx context.Context, customerID string)) *MockTokenStore_Get_Call {
+func (_c *MockTokenStore_Get_Call) Run(run func(ctx context.Context, customerID string, sessionID string)) *MockTokenStore_Get_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -143,9 +150,14 @@ func (_c *MockTokenStore_Get_Call) Run(run func(ctx context.Context, customerID 
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -156,22 +168,22 @@ func (_c *MockTokenStore_Get_Call) Return(s string, err error) *MockTokenStore_G
 	return _c
 }
 
-func (_c *MockTokenStore_Get_Call) RunAndReturn(run func(ctx context.Context, customerID string) (string, error)) *MockTokenStore_Get_Call {
+func (_c *MockTokenStore_Get_Call) RunAndReturn(run func(ctx context.Context, customerID string, sessionID string) (string, error)) *MockTokenStore_Get_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Save provides a mock function for the type MockTokenStore
-func (_mock *MockTokenStore) Save(ctx context.Context, customerID string, token string, ttl time.Duration) error {
-	ret := _mock.Called(ctx, customerID, token, ttl)
+func (_mock *MockTokenStore) Save(ctx context.Context, customerID string, sessionID string, token string, ttl time.Duration) error {
+	ret := _mock.Called(ctx, customerID, sessionID, token, ttl)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Save")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, time.Duration) error); ok {
-		r0 = returnFunc(ctx, customerID, token, ttl)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, time.Duration) error); ok {
+		r0 = returnFunc(ctx, customerID, sessionID, token, ttl)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -186,13 +198,14 @@ type MockTokenStore_Save_Call struct {
 // Save is a helper method to define mock.On call
 //   - ctx context.Context
 //   - customerID string
+//   - sessionID string
 //   - token string
 //   - ttl time.Duration
-func (_e *MockTokenStore_Expecter) Save(ctx any, customerID any, token any, ttl any) *MockTokenStore_Save_Call {
-	return &MockTokenStore_Save_Call{Call: _e.mock.On("Save", ctx, customerID, token, ttl)}
+func (_e *MockTokenStore_Expecter) Save(ctx any, customerID any, sessionID any, token any, ttl any) *MockTokenStore_Save_Call {
+	return &MockTokenStore_Save_Call{Call: _e.mock.On("Save", ctx, customerID, sessionID, token, ttl)}
 }
 
-func (_c *MockTokenStore_Save_Call) Run(run func(ctx context.Context, customerID string, token string, ttl time.Duration)) *MockTokenStore_Save_Call {
+func (_c *MockTokenStore_Save_Call) Run(run func(ctx context.Context, customerID string, sessionID string, token string, ttl time.Duration)) *MockTokenStore_Save_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -206,15 +219,20 @@ func (_c *MockTokenStore_Save_Call) Run(run func(ctx context.Context, customerID
 		if args[2] != nil {
 			arg2 = args[2].(string)
 		}
-		var arg3 time.Duration
+		var arg3 string
 		if args[3] != nil {
-			arg3 = args[3].(time.Duration)
+			arg3 = args[3].(string)
+		}
+		var arg4 time.Duration
+		if args[4] != nil {
+			arg4 = args[4].(time.Duration)
 		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -225,7 +243,7 @@ func (_c *MockTokenStore_Save_Call) Return(err error) *MockTokenStore_Save_Call 
 	return _c
 }
 
-func (_c *MockTokenStore_Save_Call) RunAndReturn(run func(ctx context.Context, customerID string, token string, ttl time.Duration) error) *MockTokenStore_Save_Call {
+func (_c *MockTokenStore_Save_Call) RunAndReturn(run func(ctx context.Context, customerID string, sessionID string, token string, ttl time.Duration) error) *MockTokenStore_Save_Call {
 	_c.Call.Return(run)
 	return _c
 }

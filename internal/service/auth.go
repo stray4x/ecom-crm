@@ -20,6 +20,7 @@ type Tokens struct {
 	AccessToken  string
 	RefreshToken string
 	CSRFToken    string
+	SessionID    string
 }
 
 type AuthService interface {
@@ -75,8 +76,8 @@ func (s *authService) Register(req dto.RegisterCustomerRequest) (*dto.CustomerRe
 	if err := s.customerRepo.Create(customer); err != nil {
 		return nil, nil, err
 	}
-
-	tokens, err := s.generateTokens(customer.ID)
+	sessionID := uuid.New().String()
+	tokens, err := s.generateTokens(customer.ID.String(), sessionID)
 
 	if err != nil {
 		return nil, nil, err
@@ -98,7 +99,8 @@ func (s *authService) Login(req dto.LoginRequest) (*dto.CustomerResponse, *Token
 		return nil, nil, errors.New("Email or password does not match")
 	}
 
-	tokens, err := s.generateTokens(customer.ID)
+	sessionID := uuid.New().String()
+	tokens, err := s.generateTokens(customer.ID.String(), sessionID)
 
 	if err != nil {
 		return nil, nil, err
@@ -108,34 +110,20 @@ func (s *authService) Login(req dto.LoginRequest) (*dto.CustomerResponse, *Token
 }
 
 func (s *authService) Refresh(refreshToken string) (*Tokens, error) {
-	token, err := jwt.Parse(refreshToken, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("invalid refresh token")
-		}
-		return []byte(s.jwtRefreshSecret), nil
-	})
-	if err != nil || !token.Valid {
-		return nil, errors.New("invalid refresh token")
-	}
+	customerID, sessionID, err := s.parseRefreshToken(refreshToken)
 
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok || claims["type"] != "refresh" {
-		return nil, errors.New("invalid refresh token")
-	}
-
-	customerID, err := uuid.Parse(claims["sub"].(string))
 	if err != nil {
-		return nil, errors.New("invalid refresh token")
+		return nil, err
 	}
 
-	stored, err := s.tokenStore.Get(context.Background(), customerID.String())
+	stored, err := s.tokenStore.Get(context.Background(), customerID, sessionID)
 	if err != nil || stored != refreshToken {
 		return nil, errors.New("refresh token revoked")
 	}
 
-	_ = s.tokenStore.Delete(context.Background(), customerID.String())
+	s.tokenStore.Delete(context.Background(), customerID, sessionID)
 
-	return s.generateTokens(customerID)
+	return s.generateTokens(customerID, sessionID)
 }
 
 func (s *authService) Logout(refreshToken string) error {
@@ -155,17 +143,32 @@ func (s *authService) Logout(refreshToken string) error {
 		return nil
 	}
 
-	customerID, err := uuid.Parse(claims["sub"].(string))
+	sub, ok := claims["sub"].(string)
+	if !ok {
+		return nil
+	}
+
+	sid, ok := claims["sid"].(string)
+	if !ok {
+		return nil
+	}
+
+	customerID, err := uuid.Parse(sub)
 	if err != nil {
 		return nil
 	}
 
-	return s.tokenStore.Delete(context.Background(), customerID.String())
+	sessionID, err := uuid.Parse(sid)
+	if err != nil {
+		return nil
+	}
+
+	return s.tokenStore.Delete(context.Background(), customerID.String(), sessionID.String())
 }
 
-func (s *authService) generateAccessToken(customerID uuid.UUID) (string, error) {
+func (s *authService) generateAccessToken(customerID string) (string, error) {
 	claims := jwt.MapClaims{
-		"sub":  customerID.String(),
+		"sub":  customerID,
 		"exp":  time.Now().Add(15 * time.Minute).Unix(),
 		"type": "access",
 	}
@@ -173,9 +176,10 @@ func (s *authService) generateAccessToken(customerID uuid.UUID) (string, error) 
 	return token.SignedString([]byte(s.jwtAccessSecret))
 }
 
-func (s *authService) generateRefreshToken(customerID uuid.UUID) (string, error) {
+func (s *authService) generateRefreshToken(customerID string, sessionID string) (string, error) {
 	claims := jwt.MapClaims{
-		"sub":  customerID.String(),
+		"sub":  customerID,
+		"sid":  sessionID,
 		"exp":  time.Now().Add(7 * 24 * time.Hour).Unix(),
 		"type": "refresh",
 	}
@@ -183,23 +187,14 @@ func (s *authService) generateRefreshToken(customerID uuid.UUID) (string, error)
 	return token.SignedString([]byte(s.jwtRefreshSecret))
 }
 
-func (s *authService) generateTokens(customerID uuid.UUID) (*Tokens, error) {
+func (s *authService) generateTokens(customerID string, sessionID string) (*Tokens, error) {
 	accessToken, err := s.generateAccessToken(customerID)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := s.generateRefreshToken(customerID)
+	refreshToken, err := s.generateRefreshToken(customerID, sessionID)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := s.tokenStore.Save(
-		context.Background(),
-		customerID.String(),
-		refreshToken,
-		7*24*time.Hour,
-	); err != nil {
 		return nil, err
 	}
 
@@ -208,10 +203,21 @@ func (s *authService) generateTokens(customerID uuid.UUID) (*Tokens, error) {
 		return nil, err
 	}
 
+	if err := s.tokenStore.Save(
+		context.Background(),
+		customerID,
+		sessionID,
+		refreshToken,
+		7*24*time.Hour,
+	); err != nil {
+		return nil, err
+	}
+
 	return &Tokens{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		CSRFToken:    csrfToken,
+		SessionID:    sessionID,
 	}, nil
 }
 
@@ -223,4 +229,43 @@ func toCustomerResponse(c *models.Customer) *dto.CustomerResponse {
 		Email:     c.Email,
 		Phone:     c.Phone,
 	}
+}
+
+func (s *authService) parseRefreshToken(refreshToken string) (customerID string, sessionID string, err error) {
+	token, err := jwt.Parse(refreshToken, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("invalid refresh token")
+		}
+		return []byte(s.jwtRefreshSecret), nil
+	})
+	if err != nil || !token.Valid {
+		return "", "", errors.New("invalid refresh token")
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || claims["type"] != "refresh" {
+		return "", "", errors.New("invalid refresh token")
+	}
+
+	sub, ok := claims["sub"].(string)
+	if !ok {
+		return "", "", errors.New("invalid refresh token")
+	}
+
+	sid, ok := claims["sid"].(string)
+	if !ok {
+		return "", "", errors.New("invalid refresh token")
+	}
+
+	cID, err := uuid.Parse(sub)
+	if err != nil {
+		return "", "", errors.New("invalid refresh token")
+	}
+
+	sID, err := uuid.Parse(sid)
+	if err != nil {
+		return "", "", errors.New("invalid refresh token")
+	}
+
+	return cID.String(), sID.String(), nil
 }

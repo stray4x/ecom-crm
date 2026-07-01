@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/stray4x/ecom-crm/docs"
 	"github.com/stray4x/ecom-crm/internal/config"
 	"github.com/stray4x/ecom-crm/internal/database"
 	"github.com/stray4x/ecom-crm/internal/handlers"
@@ -13,6 +14,11 @@ import (
 	"github.com/stray4x/ecom-crm/internal/service"
 )
 
+// @title Ecommerce CRM API
+// @version 1.0
+// @description E-commerce CRM service
+// @host localhost:8080
+// @BasePath /api
 func main() {
 	cfg := config.InitConfig()
 	db := database.NewDB(cfg)

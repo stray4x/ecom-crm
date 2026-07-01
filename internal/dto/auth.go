@@ -14,7 +14,9 @@ type LoginRequest struct {
 }
 
 type AuthResponse struct {
-	AccessToken string `json:"accessToken"`
+	Customer    CustomerResponse `json:"customer"`
+	AccessToken string           `json:"accessToken"`
+	CSRFToken   string           `json:"csrfToken"`
 }
 
 type CustomerResponse struct {
@@ -23,4 +25,13 @@ type CustomerResponse struct {
 	LastName  string `json:"lastName"`
 	Email     string `json:"email"`
 	Phone     string `json:"phone"`
+}
+
+type LogoutResponse struct {
+	Success bool `json:"success"`
+}
+
+type RefreshTokenResponse struct {
+	AccessToken string `json:"accessToken"`
+	CSRFToken   string `json:"csrfToken"`
 }
